@@ -1,0 +1,2 @@
+Correct number of arguments|script|run|ruby|test3.rb|one|four
+Incorrect number of arguments|script|run|ruby|test3.rb|one
