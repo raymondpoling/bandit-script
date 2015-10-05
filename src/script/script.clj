@@ -11,6 +11,8 @@
 
 (def max-wait (atom 30000))
 
+(def environment (atom {}))
+
 (defaction script-action
   "engine-name|script-file(|args)*
    Starts up a JRS223 script engine, and runs the specified script.
@@ -24,18 +26,23 @@
                                                  engine-name)])))
                         engine-name))
         bindings (.createBindings engine)
+        _ (doall (map #(.put bindings (first %) (second %)) @environment))
         _ (.put bindings "args" args)
         execution (future (try
                             (.eval engine
-                                   (clojure.java.io/reader (clojure.java.io/file
-                                                            (get @base-paths engine-name)
-                                                            script))
+                                   (clojure.java.io/reader
+                                    (clojure.java.io/file
+                                     (get @base-paths engine-name)
+                                     script))
                                    bindings)
                             (catch Exception e e)))
-        completed (deref execution @max-wait (Exception. (str "Did not complete within "
-                                                              (/ @max-wait 1000)
-                                                              " seconds.")))]
-    (if (not (future-done? execution)) (future-cancel execution))
+        completed (deref execution
+                         @max-wait
+                         (Exception. (str "Did not complete within "
+                                          (/ @max-wait 1000)
+                                          " seconds.")))]
+    (if (not (future-done? execution))
+      (future-cancel execution))
     (if (instance? Exception completed)
       (reify r/ResultProtocol
         (r/identifier [_] identifier)
@@ -62,7 +69,9 @@
       (if (not (nil? (get conf "max-wait")))
         (swap! max-wait (constantly (* 1000 (int (get conf "max-wait"))))))
       (if (not (nil? (get conf "base-paths")))
-        (swap! base-paths (constantly (into {} (get conf "base-paths"))))))
+        (swap! base-paths (constantly (into {} (get  conf "base-paths")))))
+      (if (not (nil? (get conf "environment")))
+        (swap! environment (constantly (into {} (get conf "environment"))))))
     (service-name [_] "script")
     (services [_] {"run" script-action})
     (close [_] nil)))
